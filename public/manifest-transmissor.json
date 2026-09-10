@@ -1,0 +1,15 @@
+{
+  "name": "Câmera Transmissor",
+  "short_name": "Transmissor",
+  "start_url": "/transmissor.html",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3067/3067444.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
