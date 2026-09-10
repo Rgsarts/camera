@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Sistema</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#000000">
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; background: #121212; color: #fff; margin: 0; padding: 20px; }
+    h1 { margin-top: 40px; }
+    .btn-container { display: flex; flex-direction: column; gap: 20px; max-width: 300px; margin: 50px auto; }
+    .btn { padding: 15px; font-size: 18px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; color: white; text-decoration: none; display: block; text-align: center; }
+    .btn-monitor { background: #007bff; }
+    .btn-transmissor { background: #28a745; }
+    .btn-audio { background: #ffc107; color: #000; margin-top: 10px; }
+    #view-monitor, #view-transmissor { display: none; }
+    img { width: 100%; max-width: 640px; border: 2px solid #444; border-radius: 8px; margin-top: 15px; }
+    
+    .stealth-mode {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: #000000;
+      z-index: 9999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .stealth-hint { color: #222; font-size: 12px; user-select: none; }
+  </style>
+</head>
+<body>
+
+  <div id="view-menu">
+    <h1>Escolha o Modo</h1>
+    <div class="btn-container">
+      <button class="btn btn-monitor" onclick="escolherModo('monitor')">Ver Monitor (Receptor)</button>
+      <button class="btn btn-transmissor" onclick="escolherModo('transmissor')">Transmitir Câmera e Áudio</button>
+    </div>
+  </div>
+
+  <div id="view-monitor">
+    <h2>Painel - Receptor</h2>
+    <img id="videoStream" alt="Aguardando transmissão...">
+    <br>
+    <audio id="audioStream" autoplay></audio>
+    <button class="btn btn-audio" onclick="ativarSom()">Ativar Som no PC</button>
+    <br><br>
+    <button class="btn" style="background:#6c757d; max-width:200px; margin:0 auto;" onclick="voltarMenu()">Voltar</button>
+  </div>
+
+  <div id="view-transmissor" class="stealth-mode" onclick="sairSurdina()">
+    <video id="video" autoplay playsinline muted style="display:none;"></video>
+    <canvas id="preview" style="display:none;"></canvas>
+    <div class="stealth-hint">.</div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    function escolherModo(modo) {
+      document.getElementById('view-menu').style.display = 'none';
+      if (modo === 'monitor') {
+        document.getElementById('view-monitor').style.display = 'block';
+        iniciarMonitor();
+      } else {
+        document.getElementById('view-transmissor').style.display = 'flex';
+        iniciarTransmissor();
+      }
+    }
+
+    function voltarMenu() {
+      window.location.reload();
+    }
+
+    function sairSurdina() {
+      if(confirm("Deseja sair da transmissão?")) {
+        window.location.reload();
+      }
+    }
+
+    function ativarSom() {
+      const audio = document.getElementById('audioStream');
+      audio.play().then(() => {
+        alert("Áudio ativado com sucesso!");
+      }).catch(err => {
+        alert("Clique na tela do PC para liberar o som.");
+      });
+    }
+
+    function iniciarMonitor() {
+      const videoStream = document.getElementById('videoStream');
+      
+      socket.on('video-frame', (image) => {
+        videoStream.src = image;
+      });
+
+      socket.on('audio-chunk', (audioData) => {
+        const blob = new Blob([audioData], { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(blob);
+        const audioElement = document.getElementById('audioStream');
+        audioElement.src = audioUrl;
+      });
+    }
+
+    async function iniciarTransmissor() {
+      const video = document.getElementById('video');
+      const canvas = document.getElementById('preview');
+      const context = canvas.getContext('2d');
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: "environment" }, 
+          audio: true 
+        });
+        video.srcObject = stream;
+
+        // Remove o mimeType fixo para o navegador usar o formato compatível do celular
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            socket.emit('audio-chunk', event.data);
+          }
+        };
+        mediaRecorder.start(500);
+
+      } catch (err) {
+        alert("Erro ao acessar câmera/microfone: " + err);
+        window.location.reload();
+      }
+
+      setInterval(() => {
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          canvas.width = video.videoWidth * 0.4;
+          canvas.height = video.videoHeight * 0.4;
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const data = canvas.toDataURL('image/jpeg', 0.4);
+          socket.emit('video-frame', data);
+        }
+      }, 150);
+    }
+  </script>
+</body>
+</html>
