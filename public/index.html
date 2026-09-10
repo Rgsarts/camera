@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Painel - Receptor de Câmera</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#121212">
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; background: #121212; color: #fff; margin-top: 20px; }
+    img { width: 100%; max-width: 640px; border: 2px solid #444; border-radius: 8px; }
+  </style>
+</head>
+<body>
+
+  <h2>Câmera ao Vivo</h2>
+  <img id="videoStream" alt="Aguardando transmissão...">
+
+  <!-- Botão de Instalação Automática -->
+  <button id="btnInstalar" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; display: none; z-index: 9999;">Instalar Aplicativo</button>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const videoStream = document.getElementById('videoStream');
+
+    socket.on('video-frame', (image) => {
+      videoStream.src = image;
+    });
+
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      document.getElementById('btnInstalar').style.display = 'block';
+    });
+
+    document.getElementById('btnInstalar').addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          document.getElementById('btnInstalar').style.display = 'none';
+        }
+        deferredPrompt = null;
+      }
+    });
+  </script>
+</body>
+</html>
